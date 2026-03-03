@@ -46,7 +46,8 @@ customer_id   Total_sales
 
 ![Top Customers]<img width="1096" height="316" alt="image" src="https://github.com/user-attachments/assets/034055d9-86e2-49af-8690-8c4aec496d1e" />
 )  
-![Profit Margin](<img width="787" height="182" alt="image" src="https://github.com/user-attachments/assets/c1832fc2-b642-49fd-a1cd-d1071453d222" />
+![Profit Margin]<img width="787" height="182" alt="Highest_profit_margin" src="https://github.com/user-attachments/assets/ad846b7a-8809-4216-9460-b69b52fe0f03" />
+
 )
 
 ## How to Run

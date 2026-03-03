@@ -1,0 +1,223 @@
+-- ======================================
+-- Basic Aggregations & Customer Info
+-- ======================================
+
+-- Total sales per category
+SELECT category, SUM(total_sale) AS total_sales
+FROM retail_sales
+GROUP BY category;
+
+-- Average age of customers in 'Beauty' category
+SELECT ROUND(AVG(age),2) AS avg_age
+FROM retail_sales
+WHERE category = 'Beauty';
+
+-- Total transactions by gender
+SELECT gender, COUNT(*) AS total_transactions
+FROM retail_sales
+GROUP BY gender;
+
+-- Total revenue by gender
+SELECT gender, SUM(total_sale) AS total_revenue
+FROM retail_sales
+GROUP BY gender;
+
+-- Average order value per customer
+SELECT customer_id, ROUND(AVG(total_sale),2) AS avg_order_value
+FROM retail_sales
+GROUP BY customer_id;
+
+-- Number of unique customers per category
+SELECT category, COUNT(DISTINCT customer_id) AS unique_customers
+FROM retail_sales
+GROUP BY category;
+
+-- ======================================
+-- Customer Behavior & Top Performers
+-- ======================================
+
+-- Top 5 customers by total sales
+SELECT customer_id, SUM(total_sale) AS total_sales
+FROM retail_sales
+GROUP BY customer_id
+ORDER BY total_sales DESC
+LIMIT 5;
+
+-- Customers buying from multiple categories
+SELECT COUNT(DISTINCT customer_id) AS multi_category_customers
+FROM retail_sales
+GROUP BY customer_id
+HAVING COUNT(DISTINCT category) > 1;
+
+-- Customers whose spending is increasing month-over-month
+SELECT customer_id
+FROM (
+    SELECT customer_id,
+           SUM(CASE WHEN monthly_total - prev_month <= 0 AND prev_month IS NOT NULL THEN 1 ELSE 0 END) AS decreasing_months
+    FROM (
+        SELECT customer_id,
+               YEAR(sale_date) AS yr,
+               MONTH(sale_date) AS mn,
+               SUM(total_sale) AS monthly_total,
+               LAG(SUM(total_sale)) OVER (PARTITION BY customer_id ORDER BY YEAR(sale_date), MONTH(sale_date)) AS prev_month
+        FROM retail_sales
+        GROUP BY customer_id, YEAR(sale_date), MONTH(sale_date)
+    ) t
+    GROUP BY customer_id
+) t2
+WHERE decreasing_months = 0;
+
+-- ======================================
+-- Time-Based Analysis
+-- ======================================
+
+-- Best-selling month per year
+SELECT year, month, avg_sale
+FROM (
+    SELECT YEAR(sale_date) AS year,
+           MONTH(sale_date) AS month,
+           AVG(total_sale) AS avg_sale,
+           ROW_NUMBER() OVER (PARTITION BY YEAR(sale_date) ORDER BY AVG(total_sale) DESC) AS rn
+    FROM retail_sales
+    GROUP BY YEAR(sale_date), MONTH(sale_date)
+) t
+WHERE rn = 1;
+
+-- Top 2 days of week by transactions in 2022
+SELECT Day, total_transactions
+FROM (
+    SELECT DAYNAME(sale_date) AS Day,
+           COUNT(transactions_id) AS total_transactions,
+           RANK() OVER (ORDER BY COUNT(transactions_id) DESC) AS rnk
+    FROM retail_sales
+    WHERE YEAR(sale_date) = 2022
+    GROUP BY DAYNAME(sale_date)
+) t
+WHERE rnk IN (1,2);
+
+-- Shift-wise orders (Morning, Afternoon, Evening)
+SELECT shift, COUNT(transactions_id) AS total_orders
+FROM (
+    SELECT CASE 
+               WHEN HOUR(sale_time) < 12 THEN 'Morning'
+               WHEN HOUR(sale_time) BETWEEN 12 AND 17 THEN 'Afternoon'
+               ELSE 'Evening'
+           END AS shift,
+           transactions_id
+    FROM retail_sales
+) t
+GROUP BY shift;
+
+-- Month-over-Month growth per category in 2023
+SELECT category, year, month, current_month_sales,
+       ROUND((current_month_sales - previous_month_sales) / previous_month_sales * 100, 2) AS MOM_growth
+FROM (
+    SELECT category, year, month, current_month_sales,
+           LAG(current_month_sales) OVER (PARTITION BY category ORDER BY year, month) AS previous_month_sales
+    FROM (
+        SELECT category, YEAR(sale_date) AS year, MONTH(sale_date) AS month, SUM(total_sale) AS current_month_sales
+        FROM retail_sales
+        GROUP BY category, YEAR(sale_date), MONTH(sale_date)
+    ) t
+) t2
+WHERE year = 2023;
+
+-- Month with highest revenue growth per year
+SELECT year, month, current_month_sales, previous_month_sales, MOM_growth
+FROM (
+    SELECT *,
+           RANK() OVER (PARTITION BY year ORDER BY (current_month_sales - previous_month_sales)/previous_month_sales DESC) AS rnk
+    FROM (
+        SELECT YEAR(sale_date) AS year,
+               MONTH(sale_date) AS month,
+               SUM(total_sale) AS current_month_sales,
+               LAG(SUM(total_sale)) OVER (ORDER BY YEAR(sale_date), MONTH(sale_date)) AS previous_month_sales,
+               ROUND((SUM(total_sale) - LAG(SUM(total_sale)) OVER (ORDER BY YEAR(sale_date), MONTH(sale_date))) / LAG(SUM(total_sale)) OVER (ORDER BY YEAR(sale_date), MONTH(sale_date)) * 100,2) AS MOM_growth
+        FROM retail_sales
+        GROUP BY YEAR(sale_date), MONTH(sale_date)
+    ) t
+) t2
+WHERE rnk = 1;
+
+-- ======================================
+-- Category & Product Analysis
+-- ======================================
+
+-- Category with highest profit margin
+SELECT category, 
+       ROUND((SUM(total_sale) - SUM(cogs))/SUM(total_sale)*100,2) AS profit_margin_pct
+FROM retail_sales
+GROUP BY category
+ORDER BY profit_margin_pct DESC
+LIMIT 1;
+
+-- Category with high COGS but low profit margin
+SELECT category, 
+       ROUND(SUM(total_sale),2) AS total_revenue,
+       ROUND(SUM(cogs),2) AS total_cogs,
+       ROUND((SUM(total_sale) - SUM(cogs))/SUM(total_sale)*100,2) AS profit_margin
+FROM retail_sales
+GROUP BY category
+ORDER BY profit_margin ASC, total_cogs DESC
+LIMIT 1;
+
+-- Category where sales are high but quantity sold is low
+SELECT category, SUM(total_sale) AS total_sales, SUM(quantity) AS total_quantity
+FROM retail_sales
+GROUP BY category
+ORDER BY total_sales DESC, total_quantity ASC
+LIMIT 1;
+
+-- Highest revenue category per month
+SELECT year, month, category, total_sales
+FROM (
+    SELECT YEAR(sale_date) AS year,
+           MONTH(sale_date) AS month,
+           category,
+           SUM(total_sale) AS total_sales,
+           ROW_NUMBER() OVER (PARTITION BY YEAR(sale_date), MONTH(sale_date) ORDER BY SUM(total_sale) DESC) AS rn
+    FROM retail_sales
+    GROUP BY YEAR(sale_date), MONTH(sale_date), category
+) t
+WHERE rn = 1;
+
+-- Declining categories over years
+SELECT category
+FROM (
+    SELECT category, YEAR(sale_date) AS year,
+           SUM(total_sale) AS total_revenue,
+           LAG(SUM(total_sale)) OVER (PARTITION BY category ORDER BY YEAR(sale_date)) AS prev_year_revenue
+    FROM retail_sales
+    GROUP BY category, YEAR(sale_date)
+) t
+GROUP BY category
+HAVING SUM(CASE WHEN total_revenue - prev_year_revenue <= 0 AND prev_year_revenue IS NOT NULL THEN 1 ELSE 0 END) >= 1;
+
+-- Top 20% customers contributing to 80% revenue (Pareto analysis)
+SELECT customer_id
+FROM (
+    SELECT customer_id,
+           SUM(total_sale) AS total_revenue,
+           SUM(SUM(total_sale)) OVER (ORDER BY SUM(total_sale) DESC) AS running_total,
+           SUM(SUM(total_sale)) OVER () AS total_revenue_sum,
+           ROUND(SUM(SUM(total_sale)) OVER (ORDER BY SUM(total_sale) DESC)/SUM(SUM(total_sale)) OVER()*100,2) AS pct_total
+    FROM retail_sales
+    GROUP BY customer_id
+) t
+WHERE pct_total <= 80;
+
+-- Age group contributing most to sales
+SELECT age_group, SUM(total_sale) AS total_sales
+FROM (
+    SELECT CASE
+             WHEN age BETWEEN 18 AND 25 THEN '18-25'
+             WHEN age BETWEEN 26 AND 40 THEN '26-40'
+             WHEN age BETWEEN 41 AND 60 THEN '41-60'
+             ELSE '61+'
+           END AS age_group,
+           total_sale
+    FROM retail_sales
+) t
+GROUP BY age_group
+ORDER BY total_sales DESC
+LIMIT 1;

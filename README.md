@@ -18,7 +18,7 @@ This project analyzes a retail sales dataset using SQL queries. It covers:
 
 ## Queries
 
-All SQL queries are in [`retail_sales.sql`](retail_sales.sql)
+All SQL queries are in [`retail_sales.sql`](retail_sales_sql_queries)
 
 ## Key Insights
 

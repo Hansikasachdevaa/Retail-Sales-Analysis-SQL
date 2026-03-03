@@ -14,11 +14,12 @@ This project analyzes a retail sales dataset using SQL queries. It covers:
 ## Dataset
 
 - Columns: `transaction_id`, `sale_date`, `sale_time`, `customer_id`, `gender`, `age`, `category`, `quantity`, `price_per_unit`, `cogs`, `total_sale`
-- Sample size: 2000 rows 
+- Sample size: 2000 rows
+- Dataset- [`retail_sales.csv`](./retail_sales.csv)
 
 ## Queries
 
-All SQL queries are in (retail_sales_sql_queries)
+All SQL queries are in [Retail_sales_sql_queries.sql](./Retail_sales_sql_queries.sql)
 
 ## Key Insights
 
